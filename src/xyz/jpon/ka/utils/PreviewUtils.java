@@ -15,14 +15,14 @@ public class PreviewUtils {
 	private PreviewUtils() {
 		// ignore
 	}
-	
+
 	public static void preview(final Image image, String title) {
 		@SuppressWarnings("serial")
 		JFrame frame = new JFrame(title) {
 			@Override
 			public void paint(Graphics g) {
 				Graphics2D g2d = (Graphics2D) g;
-				g2d.setRenderingHint( RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+				g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 				g2d.setTransform(AffineTransform.getScaleInstance(SCALE, SCALE));
 				g2d.drawImage(image, 0, 0, this);
 			}

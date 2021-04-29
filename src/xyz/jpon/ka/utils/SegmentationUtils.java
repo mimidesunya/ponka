@@ -4,11 +4,13 @@ import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
 
+import xyz.jpon.ka.utils.BinaryImage.FloodResult;
+
 public class SegmentationUtils {
 	private SegmentationUtils() {
 		// ignore
 	}
-	
+
 	static final int COLUMN_COUNT = 4;
 
 	/**
@@ -22,19 +24,19 @@ public class SegmentationUtils {
 		final int h = b.getHeight();
 
 		// ページの上下枠認識
-		int[] yscores = b.getYScores(0, 0, w, h, true);
 		int vtop = 0, vbottom = 0;
 		{
 			int state = 0;
 			LOOP: for (int y = 50; y < h; ++y) {
+				int maxRun = b.getHrizMaxRun(0, y, w, true);
 				switch (state) {
 				case 0:
-					if (yscores[y] / (double) w > .2) {
+					if (maxRun / (float) w > .2) {
 						state = 1;
 					}
 					break;
 				case 1:
-					if (yscores[y] / (double) w < .01) {
+					if (maxRun / (float) w < .01) {
 						vtop = y;
 						break LOOP;
 					}
@@ -44,14 +46,15 @@ public class SegmentationUtils {
 		{
 			int state = 0;
 			LOOP: for (int y = h - 50; y > 0; --y) {
+				int maxRun = b.getHrizMaxRun(0, y, w, true);
 				switch (state) {
 				case 0:
-					if (yscores[y] / (double) w > .2) {
+					if (maxRun / (float) w > .2) {
 						state = 1;
 					}
 					break;
 				case 1:
-					if (yscores[y] / (double) w < .01) {
+					if (maxRun / (float) w < .01) {
 						vbottom = y;
 						break LOOP;
 					}
@@ -60,21 +63,24 @@ public class SegmentationUtils {
 		}
 		final int top = vtop, bottom = vbottom;
 
-		// カラムを認識
-		int[] xscores = b.getXScores(0, 0, w, h, true);
+		// カラム境界線を認識
 		Rectangle[] columnRects = new Rectangle[COLUMN_COUNT];
 		{
 			int state = 0;
 			int column = 0;
 			Rectangle rect = null;
 			LOOP: for (int x = (int) (w * .01); x < w; ++x) {
+				int maxRun = b.getVertMaxRun(x, 0, h, true);
 				switch (state) {
 				case 0:
-					if (xscores[x] / (double) h > .2) {
+					if (maxRun / (double) h > .2) {
 						if (rect != null) {
 							rect.width = x - rect.x;
+							if (rect.width < 1000 || rect.width > 1100) {
+								throw new IllegalStateException();
+							}
 							columnRects[column] = rect;
-							if (++column > COLUMN_COUNT) {
+							if (++column > columnRects.length) {
 								break LOOP;
 							}
 						}
@@ -85,11 +91,14 @@ public class SegmentationUtils {
 					}
 					break;
 				case 1:
-					if (xscores[x] / (double) h < .1) {
+					if (maxRun / (double) h < .1) {
 						rect.x = x;
 						state = 0;
 					}
 				}
+			}
+			if (column < columnRects.length) {
+				throw new IllegalStateException();
 			}
 		}
 		return columnRects;
@@ -100,9 +109,7 @@ public class SegmentationUtils {
 	public static Rectangle[] detectEntries(BinaryImage b, Rectangle c) {
 		// 行を分割
 		Rectangle tc = new Rectangle(c);
-		b.xTrim(tc);
-		int[] yscores = b.getYScores(tc.x, tc.y, tc.width, tc.height, true);
-		int[] ycounts = b.getYCounts(tc.x, tc.y, tc.width, tc.height, true);
+		xTrim(b, tc);
 		final double LINE_THRESHOLD = .2;
 		List<Rectangle> rows = new ArrayList<Rectangle>();
 		Rectangle row = new Rectangle();
@@ -112,14 +119,16 @@ public class SegmentationUtils {
 		{
 			int state = 0, ady = 0, run = 0;
 			for (int y = 0; y < tc.height; ++y) {
+				int hmaxRun = b.getHrizMaxRun(tc.x, tc.y + y, tc.width, true);
+				int hcount = b.getHrizCount(tc.x, tc.y + y, tc.width, true);
 				switch (state) {
 				case 0:
-					if (yscores[y] / (double) tc.width > LINE_THRESHOLD) {
+					if (hmaxRun / (double) tc.width > LINE_THRESHOLD) {
 						// 広告枠検出
 						ady = y + c.y;
 						state = 2;
 						run = 0;
-					} else if (ycounts[y] >= 8) {
+					} else if (hcount >= 8) {
 						if (++run >= 3) {
 							state = 1;
 							y -= run;
@@ -133,7 +142,7 @@ public class SegmentationUtils {
 
 				case 1:
 					int height = y + c.y - row.y;
-					if (height > HEIGHT_THRESHOLD && ycounts[y] < 8) {
+					if (height > HEIGHT_THRESHOLD && hcount < 8) {
 						row.height = height;
 						rows.add(row);
 						row = new Rectangle();
@@ -141,7 +150,7 @@ public class SegmentationUtils {
 						row.x = c.x;
 						row.width = c.width;
 						state = 0;
-					} else if (yscores[y] / (double) tc.width > LINE_THRESHOLD) {
+					} else if (hmaxRun / (double) tc.width > LINE_THRESHOLD) {
 						// 広告枠検出
 						ady = y + c.y;
 						state = 2;
@@ -149,19 +158,19 @@ public class SegmentationUtils {
 					break;
 
 				case 2:
-					if (yscores[y] / (double) tc.width < LINE_THRESHOLD) {
+					if (hmaxRun / (double) tc.width < LINE_THRESHOLD) {
 						state = 3;
 					}
 					break;
 
 				case 3:
-					if (yscores[y] / (double) tc.width > LINE_THRESHOLD) {
+					if (hmaxRun / (double) tc.width > LINE_THRESHOLD) {
 						state = 4;
 					}
 					break;
 
 				case 4:
-					if (yscores[y] / (double) tc.width < .01) {
+					if (hmaxRun / (double) tc.width < .01) {
 						b.fill(new Rectangle(c.x, ady, tc.width, y + c.y - ady), false);
 						row.y = y + c.y;
 						state = 0;
@@ -176,9 +185,8 @@ public class SegmentationUtils {
 			rows.add(row);
 		}
 
-		final int FLOOD_MAX = 100;
-		final int DOT_THRESHOLD = 20;
 		// 点線を除去
+		final int FLOOD_MAX = 100;
 		for (Rectangle r : rows) {
 			Rectangle preDotRun = null;
 			int preDots = 0;
@@ -188,15 +196,15 @@ public class SegmentationUtils {
 				Rectangle maxDotRun = null;
 				int maxDots = 0;
 				for (int x = 0; x < r.width / 2; ++x) {
-					Rectangle f = b.flood(x + r.x, y + r.y, FLOOD_MAX);
+					FloodResult f = b.flood(x + r.x, y + r.y, FLOOD_MAX);
 					if (f != null) {
-						int size = f.width + f.height;
-						if (size <= DOT_THRESHOLD) { // 点線と判定
+						// 点線の縦横幅は8px,面積は48程度
+						if (f.bounds.width <= 15 && f.bounds.height <= 15 && f.area <= 70) { // 点線と判定
 							++dots;
 							if (dotRun == null) {
-								dotRun = f;
+								dotRun = f.bounds;
 							} else {
-								dotRun.add(f);
+								dotRun.add(f.bounds);
 							}
 							if (dots >= 3 && dots > maxDots) {
 								maxDotRun = dotRun;
@@ -206,7 +214,7 @@ public class SegmentationUtils {
 							dots = 0;
 							dotRun = null;
 						}
-						x = f.x + f.width - r.x;
+						x = f.bounds.x + f.bounds.width - r.x;
 					}
 				}
 				if (maxDots < preDots) {
@@ -232,12 +240,12 @@ public class SegmentationUtils {
 				}
 				int y = r.y + r.height / 2;
 				for (int x = 0; x < r.width; ++x) {
-					Rectangle f = b.flood(x + r.x, y, FLOOD_MAX);
+					FloodResult f = b.flood(x + r.x, y, FLOOD_MAX);
 					if (f != null) {
-						if (f.height > HEIGHT_THRESHOLD * 3) {
-							fills.add(new Rectangle(f.x, r.y, f.width, r.height));
+						if (f.bounds.height > HEIGHT_THRESHOLD * 3) {
+							fills.add(new Rectangle(f.bounds.x, r.y, f.bounds.width, r.height));
 						}
-						x = f.x + f.width - r.x;
+						x = f.bounds.x + f.bounds.width - r.x;
 					}
 				}
 			}
@@ -246,8 +254,46 @@ public class SegmentationUtils {
 			}
 			b.apply();
 		}
-		
+
 		return rows.toArray(new Rectangle[rows.size()]);
+	}
+
+	public static void xTrim(BinaryImage b, Rectangle r) {
+		int sx = 0, ex = r.width + r.x;
+		{
+			int run = 0;
+			for (int x = 0; x < r.width; ++x) {
+				if (b.getVertCount(r.x + x, r.y, r.height, true) >= 3) {
+					++run;
+					if (run >= 3) {
+						sx = x + r.x - run;
+						break;
+					}
+				} else {
+					run = 0;
+				}
+				if (x == r.width - 1) {
+					r.width = 0;
+					return;
+				}
+			}
+		}
+		{
+			int run = 0;
+			for (int x = r.width - 1; x >= 0; --x) {
+				if (b.getVertCount(r.x + x, r.y, r.height, true) >= 3) {
+					++run;
+					if (run >= 3) {
+						ex = x + r.x + run;
+						break;
+					}
+				} else {
+					run = 0;
+				}
+			}
+		}
+		r.x = sx;
+		r.width = ex - sx;
 	}
 
 	public static Rectangle[] detectLines(BinaryImage b, Rectangle r) {
@@ -256,11 +302,11 @@ public class SegmentationUtils {
 		if (r.height < HEIGHT_THRESHOLD * 3) {
 			lines.add(r);
 		} else {
-			int[] ywscores = b.getYScores(r.x, r.y, r.width, r.height, false);
 			Rectangle rr = null;
 			int run = 0;
 			for (int y = 0; y < r.height; ++y) {
-				if (ywscores[y] / (double) r.width <= 0.8) {
+				int maxRun = b.getHrizMaxRun(r.x, r.y + y, r.width, false);
+				if (maxRun / (double) r.width <= 0.8) {
 					++run;
 					if (rr == null && run >= 3) {
 						rr = new Rectangle();
@@ -290,7 +336,7 @@ public class SegmentationUtils {
 			}
 		}
 		for (Rectangle rr : lines) {
-			b.xTrim(rr);
+			xTrim(b, rr);
 		}
 
 		return (Rectangle[]) lines.toArray(new Rectangle[lines.size()]);
@@ -304,9 +350,9 @@ public class SegmentationUtils {
 		{
 			LOOP: for (int x = 480; x < r.width; ++x) {
 				for (int y = 0; y < r.height; ++y) {
-					Rectangle f = b.flood(x + r.x, y + r.y, 100);
-					if (f != null && f.width >= 20 && f.height >= 33) {
-						numberStart = f.x - r.x;
+					FloodResult f = b.flood(x + r.x, y + r.y, 100);
+					if (f != null && f.bounds.width >= 20 && f.bounds.height >= 33) {
+						numberStart = f.bounds.x - r.x;
 						break LOOP;
 					}
 				}
@@ -322,9 +368,12 @@ public class SegmentationUtils {
 
 		Entry entry = new Entry();
 		entry.bounds = r;
-		entry.names = SegmentationUtils.detectLines(b, new Rectangle(r.x + nameStart, r.y, numberStart - nameStart, r.height));
-		entry.nums = SegmentationUtils.detectLines(b, new Rectangle(r.x + numberStart, r.y, numberEnd - numberStart, r.height));
-		entry.addrs = SegmentationUtils.detectLines(b, new Rectangle(r.x + numberEnd, r.y, addrEnd - numberEnd, r.height));
+		entry.names = SegmentationUtils.detectLines(b,
+				new Rectangle(r.x + nameStart, r.y, numberStart - nameStart, r.height));
+		entry.nums = SegmentationUtils.detectLines(b,
+				new Rectangle(r.x + numberStart, r.y, numberEnd - numberStart, r.height));
+		entry.addrs = SegmentationUtils.detectLines(b,
+				new Rectangle(r.x + numberEnd, r.y, addrEnd - numberEnd, r.height));
 		return entry;
 	}
 }

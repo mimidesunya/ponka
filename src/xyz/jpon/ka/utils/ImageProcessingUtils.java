@@ -78,6 +78,9 @@ public class ImageProcessingUtils {
 				}
 			}
 			// 傾きの分逆回転
+			if (Math.abs(x2 - x1) > 100) {
+				throw new IllegalStateException();
+			}
 			double theta = Math.atan2(x2 - x1, (bottom - top));
 			destg.setTransform(AffineTransform.getRotateInstance(theta));
 			destg.drawImage(image, 0, 0, null);
@@ -108,9 +111,10 @@ public class ImageProcessingUtils {
 			destImage.flush();
 		}
 	}
-	
+
 	/**
 	 * 画像を二値化する。
+	 * 
 	 * @param image
 	 * @return
 	 */
