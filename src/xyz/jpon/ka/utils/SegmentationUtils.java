@@ -27,11 +27,11 @@ public class SegmentationUtils {
 		int vtop = 0, vbottom = 0;
 		{
 			int state = 0;
-			LOOP: for (int y = 50; y < h; ++y) {
+			LOOP: for (int y = 300; y < h; ++y) {
 				int maxRun = b.getHrizMaxRun(0, y, w, true);
 				switch (state) {
 				case 0:
-					if (maxRun / (float) w > .2) {
+					if (maxRun / (float) w > .1) {
 						state = 1;
 					}
 					break;
@@ -45,11 +45,11 @@ public class SegmentationUtils {
 		}
 		{
 			int state = 0;
-			LOOP: for (int y = h - 50; y > 0; --y) {
+			LOOP: for (int y = h - 100; y > 0; --y) {
 				int maxRun = b.getHrizMaxRun(0, y, w, true);
 				switch (state) {
 				case 0:
-					if (maxRun / (float) w > .2) {
+					if (maxRun / (float) w > .1) {
 						state = 1;
 					}
 					break;
@@ -62,6 +62,7 @@ public class SegmentationUtils {
 			}
 		}
 		final int top = vtop, bottom = vbottom;
+		System.out.println(top + "/" +bottom);
 
 		// カラム境界線を認識
 		Rectangle[] columnRects = new Rectangle[COLUMN_COUNT];

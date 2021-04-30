@@ -16,29 +16,44 @@ import java.util.List;
 
 import javax.imageio.ImageIO;
 
+import net.sourceforge.tess4j.ITesseract;
+import net.sourceforge.tess4j.Tesseract;
 import xyz.jpon.ka.utils.BinaryImage;
 import xyz.jpon.ka.utils.Entry;
 import xyz.jpon.ka.utils.ImageOutputUtils;
 import xyz.jpon.ka.utils.ImageProcessingUtils;
+import xyz.jpon.ka.utils.PreviewUtils;
 import xyz.jpon.ka.utils.SegmentationUtils;
 
 public class ReconstructApp {
 	static final NumberFormat FORMAT = new DecimalFormat("0000");
+	static final int DEBUG = 0;
 
 	public static void main(String[] args) throws Exception {
 		final File inDir = new File(args[0]);
 		final File outDir = new File(args[1]);
+		
+		String tessData = args[2];
+		ITesseract ocr = new Tesseract();
+		ocr.setDatapath(tessData);
+		ocr.setLanguage("jpn");
+		ocr.setPageSegMode(7);
+		ocr.setTessVariable("user_defined_dpi", "600");
 
-		for (int i = 1;; ++i) {
-			try {
-				process(inDir, outDir, i);
-			} catch (RuntimeException e) {
-				System.out.println("failed");
+		if (DEBUG != 0) {
+			process(inDir, outDir, DEBUG, ocr);
+		} else {
+			for (int i = 1;; ++i) {
+				try {
+					process(inDir, outDir, i, ocr);
+				} catch (RuntimeException e) {
+					System.out.println("failed");
+				}
 			}
 		}
 	}
 
-	public static void process(File inDir, File outDir, int page) throws IOException {
+	public static void process(File inDir, File outDir, int page, ITesseract ocr) throws IOException {
 		// 対象ファイル
 		final String pageName = FORMAT.format(page);
 		final File file = new File(inDir, pageName + ".png");
@@ -48,7 +63,9 @@ public class ReconstructApp {
 		final int w, h;
 		{
 			final Image image = ImageIO.read(file);
-			// PreviewUtils.preview(image, "処理前");
+			if (DEBUG != 0) {
+				PreviewUtils.preview(image, "処理前");
+			}
 			w = image.getWidth(null);
 			h = image.getHeight(null);
 			orgim = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
@@ -58,11 +75,15 @@ public class ReconstructApp {
 
 		System.out.println("傾き・歪み補正");
 		ImageProcessingUtils.deskew(orgim, page % 2 == 1);
-		// PreviewUtils.preview(orgim, "補正後");
+		if (DEBUG != 0) {
+			PreviewUtils.preview(orgim, "補正後");
+		}
 
 		System.out.println("二値化");
 		BinaryImage binim = ImageProcessingUtils.toBinary(orgim);
-		// PreviewUtils.preview(binim.getImage(), "二値化後");
+		if (DEBUG != 0) {
+			PreviewUtils.preview(binim.getImage(), "二値化後");
+		}
 
 		System.out.println("カラムを解析");
 		Rectangle[] columnRects = SegmentationUtils.detectColumns(binim);
@@ -113,13 +134,17 @@ public class ReconstructApp {
 					g2d.draw(r);
 				}
 			}
+			outDir.mkdir();
 			File outFile = new File(outDir, pageName + ".png");
 			ImageIO.write(aim, "png", outFile);
 		}
-		// PreviewUtils.preview(aim, "解析後");
+		if (DEBUG != 0) {
+			PreviewUtils.preview(aim, "解析後");
+		}
 
 		// 再構成
 		System.out.println("再構成");
-		ImageOutputUtils.reconstruct(binim, entries, pageName, outDir);
+		ImageOutputUtils.reconstruct(binim, entries, pageName, outDir, ocr);
+		System.out.println("完了");
 	}
 }
