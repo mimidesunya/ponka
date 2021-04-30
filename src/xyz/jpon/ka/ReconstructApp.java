@@ -26,10 +26,9 @@ public class ReconstructApp {
 	static final NumberFormat FORMAT = new DecimalFormat("0000");
 
 	public static void main(String[] args) throws Exception {
-		final File inDir = new File("H:\\電話帳\\原本\\昭和38年2月1日電話番号簿大阪市");
-		final File outDir = new File("H:\\電話帳\\作業\\昭和38年2月1日電話番号簿大阪市\\reconstruct");
+		final File inDir = new File(args[0]);
+		final File outDir = new File(args[1]);
 
-		//process(38);
 		for (int i = 1;; ++i) {
 			try {
 				process(inDir, outDir, i);

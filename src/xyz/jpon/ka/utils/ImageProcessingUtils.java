@@ -39,11 +39,11 @@ public class ImageProcessingUtils {
 			int top = 480, bottom = 4480;
 			int start, end, step;
 			if (right) {
-				start = 100;
+				start = 30;
 				end = 200;
 				step = 1;
 			} else {
-				start = w - 100;
+				start = w - 30;
 				end = w - 200;
 				step = -1;
 			}
