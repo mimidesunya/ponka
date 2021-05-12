@@ -38,49 +38,59 @@ public class ImageProcessingUtils {
 		int borderWidth = 5;
 		{
 			int top = 800, bottom = 4480;
-			int start, end, step;
+			int x1, x2;
+			int start, end, step, cside;
 			if (right) {
 				start = 30;
 				end = 300;
+				cside = w - 30;
 				step = 1;
 			} else {
 				start = w - 30;
 				end = w - 300;
+				cside = 30;
 				step = -1;
 			}
-			int x1 = 0;
-			{
-				int run = 0;
-				for (int x = start; x != end; x += step) {
-					if (isInk(image.getRGB(x, top)) && isInk(image.getRGB(x, top - borderWidth))) {
-						++run;
-					} else {
-						if (run >= borderWidth) {
-							x1 = x;
-							break;
+			for (;;) {
+				x1 = 0;
+				{
+					int run = 0;
+					for (int x = start; x != end; x += step) {
+						if (isInk(image.getRGB(x, top - borderWidth)) && isInk(image.getRGB(x, top + borderWidth))) {
+							++run;
+						} else {
+							if (run >= borderWidth) {
+								x1 = x;
+								break;
+							}
+							run = 0;
 						}
-						run = 0;
 					}
 				}
-			}
-			int x2 = 0;
-			{
-				int run = 0;
-				for (int x = start; x != end; x += step) {
-					if (isInk(image.getRGB(x, bottom)) && isInk(image.getRGB(x, bottom + borderWidth))) {
-						++run;
-					} else {
-						if (run >= borderWidth) {
-							x2 = x;
-							break;
+				x2 = 0;
+				{
+					int run = 0;
+					for (int x = start; x != end; x += step) {
+						if (isInk(image.getRGB(x, bottom - borderWidth)) && isInk(image.getRGB(x, bottom + borderWidth))) {
+							++run;
+						} else {
+							if (run >= borderWidth) {
+								x2 = x;
+								break;
+							}
+							run = 0;
 						}
-						run = 0;
 					}
 				}
-			}
-			// 傾きの分逆回転
-			if (Math.abs(x2 - x1) > 100) {
-				throw new IllegalStateException("x1="+x1+",x2="+x2);
+				// 傾きの分逆回転
+				if (Math.abs(x2 - x1) > 100) {
+					if (top > 2000) {
+						throw new IllegalStateException("x1=" + x1 + ",x2=" + x2);
+					}
+					top += borderWidth;
+					continue;
+				}
+				break;
 			}
 			double theta = Math.atan2(x2 - x1, (bottom - top));
 			destg.setTransform(AffineTransform.getRotateInstance(theta));
@@ -90,9 +100,38 @@ public class ImageProcessingUtils {
 
 			// 重力による歪み補正
 			int block = borderWidth * 2;
-			for (int y = block; y < h - block; y += block) {
+			int xx1 = 0;
+			{
+				int run = 0;
+				for (int x = x1 + 4220 * step; x != cside; x += step) {
+					if (isInk(image.getRGB(x, top - borderWidth)) && isInk(image.getRGB(x, top + borderWidth))) {
+						++run;
+					} else {
+						if (run >= borderWidth) {
+							xx1 = x;
+							break;
+						}
+						run = 0;
+					}
+				}
+			}
+			int pshift = 0, psshift = 0;
+			for (int y = top; y < h - block; y += block) {
 				int run = 0;
 				x2 = 0;
+				int xx2 = 0;
+				for (int x = x1 + 4220 * step; x != cside; x += step) {
+					if (isInk(image.getRGB(x, y - borderWidth)) && isInk(image.getRGB(x, y + borderWidth))) {
+						++run;
+					} else {
+						if (run >= borderWidth) {
+							xx2 = x;
+							break;
+						}
+						run = 0;
+					}
+				}
+				run = 0;
 				for (int x = start; x != end; x += step) {
 					if (isInk(image.getRGB(x, y - borderWidth)) && isInk(image.getRGB(x, y + borderWidth))) {
 						++run;
@@ -104,10 +143,20 @@ public class ImageProcessingUtils {
 						run = 0;
 					}
 				}
-				int shift = x1 - x2;
-				if (x2 != 0 && shift < 30 && shift > -30) {
-					destg.drawImage(image, 60 + shift, y, w - 60 + shift, y + block, 60, y, w - 60, y + block, null);
+				int shift = x2 - x1;
+				int sshift = xx2 - xx1;
+				if (Math.abs(shift - pshift) >= 3) {
+					shift = pshift;
 				}
+				if (Math.abs(sshift - psshift) >= 3) {
+					sshift = psshift;
+				}
+				if (shift != 0 || sshift != 0) {
+					destg.drawImage(image, 60 + shift, y, w - 60 + shift - sshift, y + block, 60, y, w - 60, y + block,
+							null);
+				}
+				pshift = shift;
+				psshift = sshift;
 			}
 			srcg.drawImage(destImage, 0, 0, null);
 			destImage.flush();
@@ -126,7 +175,7 @@ public class ImageProcessingUtils {
 		BufferedImage binim = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_BINARY);
 		for (int y = 0; y < h; ++y) {
 			for (int x = 0; x < w; ++x) {
-				binim.setRGB(x, y, isInk(image.getRGB(x, y)) ? 0 : 0xFFFFFFFF);
+				binim.setRGB(x, y, isInk(image.getRGB(x, y)) ? 0xFF000000 : 0xFFFFFFFF);
 			}
 		}
 		return new BinaryImage(binim);

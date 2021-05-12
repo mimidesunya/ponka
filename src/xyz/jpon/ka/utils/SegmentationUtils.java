@@ -23,47 +23,6 @@ public class SegmentationUtils {
 		final int w = b.getWidth();
 		final int h = b.getHeight();
 
-		// ページの上下枠認識
-		int vtop = 0, vbottom = 0;
-		{
-			int state = 0;
-			LOOP: for (int y = 300; y < h; ++y) {
-				int maxRun = b.getHrizMaxRun(0, y, w, true);
-				switch (state) {
-				case 0:
-					if (maxRun / (float) w > .1) {
-						state = 1;
-					}
-					break;
-				case 1:
-					if (maxRun / (float) w < .01) {
-						vtop = y;
-						break LOOP;
-					}
-				}
-			}
-		}
-		{
-			int state = 0;
-			LOOP: for (int y = h - 100; y > 0; --y) {
-				int maxRun = b.getHrizMaxRun(0, y, w, true);
-				switch (state) {
-				case 0:
-					if (maxRun / (float) w > .1) {
-						state = 1;
-					}
-					break;
-				case 1:
-					if (maxRun / (float) w < .01) {
-						vbottom = y;
-						break LOOP;
-					}
-				}
-			}
-		}
-		final int top = vtop, bottom = vbottom;
-		System.out.println(top + "/" +bottom);
-
 		// カラム境界線を認識
 		Rectangle[] columnRects = new Rectangle[COLUMN_COUNT];
 		{
@@ -74,11 +33,38 @@ public class SegmentationUtils {
 				int maxRun = b.getVertMaxRun(x, 0, h, true);
 				switch (state) {
 				case 0:
-					if (maxRun / (double) h > .2) {
+					if (maxRun / (double) h >= .1) {
 						if (rect != null) {
-							rect.width = x - rect.x;
-							if (rect.width < 1000 || rect.width > 1100) {
-								throw new IllegalStateException();
+							int cw = x - rect.x;
+							if (cw < 1000 || cw > 1100) {
+								throw new IllegalStateException("cw="+cw);
+							}
+							rect.width = cw;
+							// カラムの上下枠認識
+							int state2 = 0;
+							LOOP2: for (int y = 300; y < h; ++y) {
+								// カラム上部の線を検出
+								int maxRun2 = b.getHrizMaxRun(rect.x, y, rect.width, true);
+								switch (state2) {
+								case 0:
+									if (maxRun2 / (float) rect.width > .1) {
+										state2 = 1;
+									}
+									break;
+								case 1:
+									if (maxRun2 / (float) rect.width < .01) {
+										rect.y = y;
+										break LOOP2;
+									}
+								}
+							}
+							for (int y = rect.y+6200; y < h; ++y) {
+								// 余白部分に線がある場所を検出
+								int count = b.getHrizCount(rect.x, y, 30, true);
+								if (count / (float) 30 > .9) {
+									rect.height = y - rect.y - 1;
+									break;
+								}
 							}
 							columnRects[column] = rect;
 							if (++column > columnRects.length) {
@@ -86,13 +72,11 @@ public class SegmentationUtils {
 							}
 						}
 						rect = new Rectangle();
-						rect.y = top;
-						rect.height = bottom - top;
 						state = 1;
 					}
 					break;
 				case 1:
-					if (maxRun / (double) h < .1) {
+					if (maxRun / (double) h < .05) {
 						rect.x = x;
 						state = 0;
 					}
@@ -111,7 +95,7 @@ public class SegmentationUtils {
 		// 行を分割
 		Rectangle tc = new Rectangle(c);
 		xTrim(b, tc);
-		final double LINE_THRESHOLD = .2;
+		final double LINE_THRESHOLD = .1;
 		List<Rectangle> rows = new ArrayList<Rectangle>();
 		Rectangle row = new Rectangle();
 		row.y = c.y;
@@ -306,7 +290,7 @@ public class SegmentationUtils {
 			Rectangle rr = null;
 			int run = 0;
 			for (int y = 0; y < r.height; ++y) {
-				int maxRun = b.getHrizMaxRun(r.x, r.y + y, r.width, false);
+				int maxRun = b.getHrizMaxRunForLine(r.x, r.y + y, r.width);
 				if (maxRun / (double) r.width <= 0.8) {
 					++run;
 					if (rr == null && run >= 3) {

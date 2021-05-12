@@ -28,41 +28,61 @@ import xyz.jpon.ka.utils.SegmentationUtils;
 public class ReconstructApp {
 	static final NumberFormat FORMAT = new DecimalFormat("0000");
 	static final int DEBUG = 0;
+	static final int THREADS = Runtime.getRuntime().availableProcessors() * 2 / 3;
 
 	public static void main(String[] args) throws Exception {
 		final File inDir = new File(args[0]);
 		final File outDir = new File(args[1]);
-		
-		String tessData = args[2];
-		ITesseract ocr = new Tesseract();
-		ocr.setDatapath(tessData);
-		ocr.setLanguage("jpn");
-		ocr.setPageSegMode(7);
-		ocr.setTessVariable("user_defined_dpi", "600");
+		final String tessData = args[2];
 
 		if (DEBUG != 0) {
-			process(inDir, outDir, DEBUG, ocr);
+			ITesseract ocr = new Tesseract();
+			ocr.setDatapath(tessData);
+			ocr.setLanguage("jpn");
+			ocr.setPageSegMode(7);
+			ocr.setTessVariable("user_defined_dpi", "600");
+			final String pageName = FORMAT.format(DEBUG);
+			final File inFile = new File(inDir, pageName + ".png");
+			process(inFile, outDir, DEBUG, ocr);
 		} else {
+			Thread[] th = new Thread[THREADS];
 			for (int i = 1;; ++i) {
-				try {
-					process(inDir, outDir, i, ocr);
-				} catch (RuntimeException e) {
-					System.out.println("failed");
+				final String pageName = FORMAT.format(i);
+				final File inFile = new File(inDir, pageName + ".png");
+				if (!inFile.exists()) {
+					break;
 				}
+				final int page = i;
+				if (th[i % th.length] != null) {
+					th[i % th.length].join();
+				}
+				th[i % th.length] = new Thread(() -> {
+					try {
+						ITesseract ocr = new Tesseract();
+						ocr.setDatapath(tessData);
+						ocr.setLanguage("jpn");
+						ocr.setPageSegMode(7);
+						ocr.setTessVariable("user_defined_dpi", "600");
+						process(inFile, outDir, page, ocr);
+					} catch (Exception e) {
+						System.out.println("failed");
+					}
+				});
+				th[i % th.length].start();
 			}
+
 		}
 	}
 
-	public static void process(File inDir, File outDir, int page, ITesseract ocr) throws IOException {
+	public static void process(File inFile, File outDir, int page, ITesseract ocr) throws IOException {
 		// 対象ファイル
 		final String pageName = FORMAT.format(page);
-		final File file = new File(inDir, pageName + ".png");
 
-		System.out.println("処理開始:" + file);
+		System.out.println("処理開始:" + inFile);
 		final BufferedImage orgim;
 		final int w, h;
 		{
-			final Image image = ImageIO.read(file);
+			final Image image = ImageIO.read(inFile);
 			if (DEBUG != 0) {
 				PreviewUtils.preview(image, "処理前");
 			}
@@ -89,8 +109,9 @@ public class ReconstructApp {
 		Rectangle[] columnRects = SegmentationUtils.detectColumns(binim);
 		List<Rectangle> rows = new ArrayList<Rectangle>();
 		for (int i = 0; i < columnRects.length; ++i) {
-			System.out.println("カラム " + i + "/" + columnRects.length);
-			rows.addAll(Arrays.asList(SegmentationUtils.detectEntries(binim, columnRects[i])));
+			Rectangle[] rects = SegmentationUtils.detectEntries(binim, columnRects[i]);
+			System.out.println("カラム " + i + "/" + columnRects.length + "/"+columnRects[i]+"/"+rects.length+" entries");
+			rows.addAll(Arrays.asList(rects));
 		}
 		binim.apply();
 

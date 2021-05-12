@@ -61,6 +61,21 @@ public class BinaryImage {
 		return max;
 	}
 
+	public int getHrizMaxRunForLine(int x, int y, int w) {
+		int run = 0, max = 0;
+		for (int xx = 0; xx < w; ++xx) {
+			if (this.get(xx + x, y) && (y == 0 || this.get(xx + x, y - 1))) {
+				run = 0;
+			} else {
+				++run;
+				if (run > max) {
+					max = run;
+				}
+			}
+		}
+		return max;
+	}
+
 	public int getVertMaxRun(int x, int y, int h, boolean black) {
 		int run = 0, max = 0;
 		for (int yy = 0; yy < h; ++yy) {

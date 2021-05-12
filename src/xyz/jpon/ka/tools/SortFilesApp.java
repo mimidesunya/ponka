@@ -10,7 +10,7 @@ import org.apache.commons.io.comparator.NameFileComparator;
 public class SortFilesApp {
 
 	public static void main(String[] args) throws Exception {
-		File dir = new File("H:\\電話帳\\原本\\昭和12年4月1日現在横浜市電話番号簿");
+		File dir = new File("H:\\電話帳\\原本\\昭和14年4月1日現在横浜市電話番号簿");
 		{
 			File[] files = dir.listFiles();
 			Arrays.sort(files, NameFileComparator.NAME_COMPARATOR);
