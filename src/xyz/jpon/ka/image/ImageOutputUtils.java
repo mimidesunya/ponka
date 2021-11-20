@@ -1,4 +1,4 @@
-package xyz.jpon.ka.utils;
+package xyz.jpon.ka.image;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -19,6 +19,7 @@ import javax.imageio.ImageIO;
 
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.TesseractException;
+import xyz.jpon.ka.processing.Entry;
 
 public class ImageOutputUtils {
 	private ImageOutputUtils() {

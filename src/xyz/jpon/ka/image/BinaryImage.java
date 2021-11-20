@@ -1,4 +1,4 @@
-package xyz.jpon.ka.utils;
+package xyz.jpon.ka.image;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -11,6 +11,24 @@ import java.util.BitSet;
 public class BinaryImage {
 	private final BufferedImage binim;
 	private WritableRaster raster;
+
+	/**
+	 * 画像を二値化する。
+	 * 
+	 * @param image
+	 * @return
+	 */
+	public static BinaryImage toBinary(BufferedImage image, Binarizer binr) {
+		final int w = image.getWidth();
+		final int h = image.getHeight();
+		BufferedImage binim = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_BINARY);
+		for (int y = 0; y < h; ++y) {
+			for (int x = 0; x < w; ++x) {
+				binim.setRGB(x, y, binr.isInk(image.getRGB(x, y)) ? 0xFF000000 : 0xFFFFFFFF);
+			}
+		}
+		return new BinaryImage(binim);
+	}
 
 	public BinaryImage(BufferedImage binim) {
 		this.binim = binim;
@@ -46,16 +64,20 @@ public class BinaryImage {
 		}
 	}
 
-	public int getHrizMaxRun(int x, int y, int w, boolean black) {
-		int run = 0, max = 0;
+	public int getHrizMaxRun(int x, int y, int w, boolean black, int maxGap) {
+		int run = 0, max = 0, gap = 0;
 		for (int xx = 0; xx < w; ++xx) {
 			if (this.get(xx + x, y) ^ black) {
-				run = 0;
-			} else {
-				++run;
-				if (run > max) {
-					max = run;
+				if (++gap > maxGap) {
+					run = 0;
+					continue;
 				}
+			} else {
+				gap = 0;
+			}
+			++run;
+			if (run > max) {
+				max = run;
 			}
 		}
 		return max;
@@ -66,26 +88,40 @@ public class BinaryImage {
 		for (int xx = 0; xx < w; ++xx) {
 			if (this.get(xx + x, y) && (y == 0 || this.get(xx + x, y - 1))) {
 				run = 0;
-			} else {
-				++run;
-				if (run > max) {
-					max = run;
-				}
+				continue;
+			}
+			++run;
+			if (run > max) {
+				max = run;
 			}
 		}
 		return max;
 	}
 
-	public int getVertMaxRun(int x, int y, int h, boolean black) {
-		int run = 0, max = 0;
+	/**
+	 * 指定した地点から縦方向のhピクセルの最大のランを計測します。
+	 * 
+	 * @param x
+	 * @param y
+	 * @param h
+	 * @param black
+	 * @param maxGap 許容する最大ギャップサイズ。
+	 * @return
+	 */
+	public int getVertMaxRun(int x, int y, int h, boolean black, int maxGap) {
+		int run = 0, max = 0, gap = 0;
 		for (int yy = 0; yy < h; ++yy) {
 			if (this.get(x, yy + y) ^ black) {
-				run = 0;
-			} else {
-				++run;
-				if (run > max) {
-					max = run;
+				if (++gap > maxGap) {
+					run = 0;
+					continue;
 				}
+			} else {
+				gap = 0;
+			}
+			++run;
+			if (run > max) {
+				max = run;
 			}
 		}
 		return max;
@@ -119,9 +155,9 @@ public class BinaryImage {
 		this.raster = this.binim.copyData(this.raster);
 	}
 
-	class FloodResult {
-		int area = 0;
-		Rectangle bounds = new Rectangle();
+	public class FloodResult {
+		public int area = 0;
+		public Rectangle bounds = new Rectangle();
 	}
 
 	public FloodResult flood(int x, int y, int max) {

@@ -1,4 +1,4 @@
-package xyz.jpon.ka.utils;
+package xyz.jpon.ka.image;
 
 import java.awt.Graphics;
 import java.awt.Graphics2D;

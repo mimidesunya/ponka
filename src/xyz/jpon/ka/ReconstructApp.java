@@ -18,17 +18,20 @@ import javax.imageio.ImageIO;
 
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
-import xyz.jpon.ka.utils.BinaryImage;
-import xyz.jpon.ka.utils.Entry;
-import xyz.jpon.ka.utils.ImageOutputUtils;
-import xyz.jpon.ka.utils.ImageProcessingUtils;
-import xyz.jpon.ka.utils.PreviewUtils;
-import xyz.jpon.ka.utils.SegmentationUtils;
+import xyz.jpon.ka.image.Binarizer;
+import xyz.jpon.ka.image.BinaryImage;
+import xyz.jpon.ka.image.ImageOutputUtils;
+import xyz.jpon.ka.image.PreviewUtils;
+import xyz.jpon.ka.image.ThreasholdBinarizer;
+import xyz.jpon.ka.processing.DeskewUtils;
+import xyz.jpon.ka.processing.Entry;
+import xyz.jpon.ka.processing.SegmentationUtils;
 
 public class ReconstructApp {
 	static final NumberFormat FORMAT = new DecimalFormat("0000");
 	static final int DEBUG = 0;
-	static final int THREADS = Runtime.getRuntime().availableProcessors() * 2 / 3;
+	static final int THREADS = 20;
+	static volatile int page = 0;
 
 	public static void main(String[] args) throws Exception {
 		final File inDir = new File(args[0]);
@@ -36,47 +39,44 @@ public class ReconstructApp {
 		final String tessData = args[2];
 
 		if (DEBUG != 0) {
-			ITesseract ocr = new Tesseract();
-			ocr.setDatapath(tessData);
-			ocr.setLanguage("jpn");
-			ocr.setPageSegMode(7);
-			ocr.setTessVariable("user_defined_dpi", "600");
-			final String pageName = FORMAT.format(DEBUG);
-			final File inFile = new File(inDir, pageName + ".png");
-			process(inFile, outDir, DEBUG, ocr);
+			process(inDir, outDir, DEBUG, tessData);
 		} else {
 			Thread[] th = new Thread[THREADS];
-			for (int i = 1;; ++i) {
-				final String pageName = FORMAT.format(i);
-				final File inFile = new File(inDir, pageName + ".png");
-				if (!inFile.exists()) {
-					break;
-				}
-				final int page = i;
-				if (th[i % th.length] != null) {
-					th[i % th.length].join();
-				}
-				th[i % th.length] = new Thread(() -> {
-					try {
-						ITesseract ocr = new Tesseract();
-						ocr.setDatapath(tessData);
-						ocr.setLanguage("jpn");
-						ocr.setPageSegMode(7);
-						ocr.setTessVariable("user_defined_dpi", "600");
-						process(inFile, outDir, page, ocr);
-					} catch (Exception e) {
-						System.out.println("failed");
+			for (int i = 0; i < THREADS; ++i) {
+				th[i] = new Thread(() -> {
+					for (;;) {
+						try {
+							if (!process(inDir, outDir, ++page, tessData)) {
+								break;
+							}
+						} catch (Exception e) {
+							System.out.println("failed");
+						}
 					}
 				});
-				th[i % th.length].start();
+				th[i].start();
+			}
+			for (int i = 0; i < THREADS; ++i) {
+				th[i].join();
 			}
 
 		}
 	}
 
-	public static void process(File inFile, File outDir, int page, ITesseract ocr) throws IOException {
+	public static boolean process(File inDir, File outDir, int page, String tessData) throws IOException {
 		// 対象ファイル
 		final String pageName = FORMAT.format(page);
+		final File inFile = new File(inDir, pageName + ".png");
+		if (!inFile.exists()) {
+			return false;
+		}
+
+		// OCR
+		ITesseract ocr = new Tesseract();
+		ocr.setDatapath(tessData);
+		ocr.setLanguage("jpn");
+		ocr.setPageSegMode(7);
+		ocr.setTessVariable("user_defined_dpi", "600");
 
 		System.out.println("処理開始:" + inFile);
 		final BufferedImage orgim;
@@ -92,15 +92,17 @@ public class ReconstructApp {
 			Graphics2D g2d = (Graphics2D) orgim.getGraphics();
 			g2d.drawImage(image, 0, 0, null);
 		}
+		
+		Binarizer binr = new ThreasholdBinarizer(0x80);
 
 		System.out.println("傾き・歪み補正");
-		ImageProcessingUtils.deskew(orgim, page % 2 == 1);
+		DeskewUtils.deskew(orgim, binr, page % 2 == 1);
 		if (DEBUG != 0) {
 			PreviewUtils.preview(orgim, "補正後");
 		}
 
 		System.out.println("二値化");
-		BinaryImage binim = ImageProcessingUtils.toBinary(orgim);
+		BinaryImage binim = BinaryImage.toBinary(orgim, binr);
 		if (DEBUG != 0) {
 			PreviewUtils.preview(binim.getImage(), "二値化後");
 		}
@@ -110,7 +112,8 @@ public class ReconstructApp {
 		List<Rectangle> rows = new ArrayList<Rectangle>();
 		for (int i = 0; i < columnRects.length; ++i) {
 			Rectangle[] rects = SegmentationUtils.detectEntries(binim, columnRects[i]);
-			System.out.println("カラム " + i + "/" + columnRects.length + "/"+columnRects[i]+"/"+rects.length+" entries");
+			System.out.println(
+					"カラム " + i + "/" + columnRects.length + "/" + columnRects[i] + "/" + rects.length + " entries");
 			rows.addAll(Arrays.asList(rects));
 		}
 		binim.apply();
@@ -167,5 +170,6 @@ public class ReconstructApp {
 		System.out.println("再構成");
 		ImageOutputUtils.reconstruct(binim, entries, pageName, outDir, ocr);
 		System.out.println("完了");
+		return true;
 	}
 }

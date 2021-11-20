@@ -1,4 +1,4 @@
-package xyz.jpon.ka.utils;
+package xyz.jpon.ka.processing;
 
 import java.awt.Rectangle;
 

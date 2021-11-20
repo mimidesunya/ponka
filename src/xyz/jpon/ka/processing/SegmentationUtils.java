@@ -1,10 +1,11 @@
-package xyz.jpon.ka.utils;
+package xyz.jpon.ka.processing;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
 
-import xyz.jpon.ka.utils.BinaryImage.FloodResult;
+import xyz.jpon.ka.image.BinaryImage;
+import xyz.jpon.ka.image.BinaryImage.FloodResult;
 
 public class SegmentationUtils {
 	private SegmentationUtils() {
@@ -30,7 +31,7 @@ public class SegmentationUtils {
 			int column = 0;
 			Rectangle rect = null;
 			LOOP: for (int x = (int) (w * .01); x < w; ++x) {
-				int maxRun = b.getVertMaxRun(x, 0, h, true);
+				int maxRun = b.getVertMaxRun(x, 0, h, true, 2);
 				switch (state) {
 				case 0:
 					if (maxRun / (double) h >= .1) {
@@ -44,7 +45,7 @@ public class SegmentationUtils {
 							int state2 = 0;
 							LOOP2: for (int y = 300; y < h; ++y) {
 								// カラム上部の線を検出
-								int maxRun2 = b.getHrizMaxRun(rect.x, y, rect.width, true);
+								int maxRun2 = b.getHrizMaxRun(rect.x, y, rect.width, true, 2);
 								switch (state2) {
 								case 0:
 									if (maxRun2 / (float) rect.width > .1) {
@@ -104,7 +105,7 @@ public class SegmentationUtils {
 		{
 			int state = 0, ady = 0, run = 0;
 			for (int y = 0; y < tc.height; ++y) {
-				int hmaxRun = b.getHrizMaxRun(tc.x, tc.y + y, tc.width, true);
+				int hmaxRun = b.getHrizMaxRun(tc.x, tc.y + y, tc.width, true, 2);
 				int hcount = b.getHrizCount(tc.x, tc.y + y, tc.width, true);
 				switch (state) {
 				case 0:
