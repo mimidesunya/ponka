@@ -24,10 +24,10 @@ public class PreviewUtils {
 				Graphics2D g2d = (Graphics2D) g;
 				g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 				g2d.setTransform(AffineTransform.getScaleInstance(SCALE, SCALE));
-				g2d.drawImage(image, 0, 0, this);
+				g2d.drawImage(image, 100, 100, this);
 			}
 		};
-		frame.setSize((int) (image.getWidth(frame) * SCALE), (int) (image.getHeight(frame) * SCALE));
+		frame.setSize((int) (image.getWidth(frame) * SCALE)+100, (int) (image.getHeight(frame) * SCALE)+100);
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		frame.setVisible(true);
 	}
