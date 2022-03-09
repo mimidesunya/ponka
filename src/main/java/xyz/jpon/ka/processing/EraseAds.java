@@ -6,6 +6,8 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class EraseAds {
 	protected final Mask mask1, mask2;
@@ -27,20 +29,15 @@ public class EraseAds {
 	 * @param b
 	 * @return
 	 */
-	public void eraseAds(BufferedImage orgim, Rectangle column) {
+	public Rectangle[] eraseAds(BufferedImage binim, Rectangle column) {
 		int[] image;
-		int w = orgim.getWidth(null);
-		int h = orgim.getHeight(null);
-		{
-			BufferedImage binim = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_BINARY);
-			Graphics2D g2d = (Graphics2D) binim.getGraphics();
-			g2d.drawImage(orgim, 0, 0, w, h, null);
-			image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
-		}
-		Graphics2D g2d = (Graphics2D) orgim.getGraphics();
-		Color fill = new Color(0xFF, 0xCC, 0xCC);
-		g2d.setColor(fill);
+		int w = binim.getWidth(null);
+		int h = binim.getHeight(null);
+		image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
+		Graphics2D g2d = (Graphics2D) binim.getGraphics();
+		g2d.setColor(Color.WHITE);
 
+		List<Rectangle> ads = new ArrayList<Rectangle>();
 		int ystart = 0;
 		int xend = column.width / 6;
 		for (int y = 0; y < column.height; ++y) {
@@ -53,11 +50,14 @@ public class EraseAds {
 				} else {
 					if (this.mask2.match(image, column.x + x, column.y + y, w)) {
 						y += this.mask2.h;
-						g2d.fillRect(column.x, column.y + ystart, column.width, y - ystart);
+						Rectangle ad = new Rectangle(column.x, column.y + ystart, column.width, y - ystart);
+						g2d.fill(ad);
+						ads.add(ad);
 						ystart = 0;
 					}
 				}
 			}
 		}
+		return ads.toArray(new Rectangle[ads.size()]);
 	}
 }

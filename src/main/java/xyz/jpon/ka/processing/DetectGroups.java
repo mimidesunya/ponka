@@ -65,11 +65,11 @@ public class DetectGroups {
 			g2d.drawImage(image, 0, 0, null);
 			if (left) {
 				{
-				AffineTransform tx = AffineTransform.getScaleInstance(-1, 1);
-				tx.translate(-w, 0);
-				AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-				bim = op.filter(bim, null);
-				this.top = Mask.createMask(bim, t);
+					AffineTransform tx = AffineTransform.getScaleInstance(-1, 1);
+					tx.translate(-w, 0);
+					AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+					bim = op.filter(bim, null);
+					this.top = Mask.createMask(bim, t);
 				}
 				{
 					AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
@@ -116,19 +116,14 @@ public class DetectGroups {
 	 * @param b
 	 * @return
 	 */
-	public void detectGroups(BufferedImage orgim, Rectangle column, int marker, int markerWidth) {
+	public void detectGroups(BufferedImage binim, Rectangle column, int marker, int markerWidth) {
 		// 最初に小さなパターンでマッチングして
 		// &条件で大きなパターンでマッチングすると高速かつ高精度になる
 		int[] image;
-		int w = orgim.getWidth(null);
-		int h = orgim.getHeight(null);
-		{
-			BufferedImage binim = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_BINARY);
-			Graphics2D g2d = (Graphics2D) binim.getGraphics();
-			g2d.drawImage(orgim, 0, 0, w, h, null);
-			image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
-		}
-		Graphics2D g2d = (Graphics2D) orgim.getGraphics();
+		int w = binim.getWidth(null);
+		int h = binim.getHeight(null);
+		image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
+		Graphics2D g2d = (Graphics2D) binim.getGraphics();
 
 		Color fill = new Color(0xCC, 0xFF, 0xCC);
 		int ystart = 0;

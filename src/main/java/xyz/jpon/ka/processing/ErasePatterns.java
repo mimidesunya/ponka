@@ -19,17 +19,12 @@ public class ErasePatterns {
 	 * @param b
 	 * @return
 	 */
-	public void erasePatterns(BufferedImage orgim, Rectangle column) {
+	public void erasePatterns(BufferedImage binim, Rectangle column) {
 		int[] image;
-		int w = orgim.getWidth(null);
-		int h = orgim.getHeight(null);
-		{
-			BufferedImage binim = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_BINARY);
-			Graphics2D g2d = (Graphics2D) binim.getGraphics();
-			g2d.drawImage(orgim, 0, 0, w, h, null);
-			image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
-		}
-		Graphics2D g2d = (Graphics2D) orgim.getGraphics();
+		int w = binim.getWidth(null);
+		int h = binim.getHeight(null);
+		image = binim.getRaster().getSamples(0, 0, w, h, 0, new int[w * h]);
+		Graphics2D g2d = (Graphics2D) binim.getGraphics();
 		g2d.setColor(Color.WHITE);
 
 		for (int y = 0; y < column.height; ++y) {

@@ -1,5 +1,6 @@
 package xyz.jpon.ka.processing;
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
@@ -34,6 +35,9 @@ public class DetectColumns {
 
 		final BufferedImage workImage = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D wg = (Graphics2D) workImage.getGraphics();
+		wg.setColor(Color.WHITE);
+		wg.fillRect(0, 0, w, h);
+		
 		Rectangle[] columnRects = new Rectangle[count];
 		int ystart = 0;
 		int yend = h - this.mask.h - 1;
