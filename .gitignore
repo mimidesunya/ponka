@@ -16,3 +16,6 @@ AGENTS.md
 CLAUDE.md
 .agents/
 .claude/
+
+# 内部インフラのパス・非公開プロジェクトの内部構造に触れるため非公開
+doc/data-sources.md
