@@ -10,3 +10,9 @@ data/
 output/
 .venv/
 .venv311/
+
+# AI エージェント定義はローカル専用
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
