@@ -1,0 +1,77 @@
+Book: {book_name}
+Page: {page}
+Column: {column}
+
+You will receive:
+1. optional previous OCR tail JSON
+2. target column image
+
+Read only the target column image for rawText, cleanText, phones, names, and
+addresses. Use the previous OCR tail only to judge whether the first visible
+segment is a continuation of the previous column's last entry.
+
+Return a JSON object with this structure exactly:
+{{
+  "segments": [
+    {{
+      "segmentId": "{page:04d}-{column:02d}-0001",
+      "sequence": 1,
+      "entryType": "directory_entry",
+      "rawText": "text exactly as read from the target column",
+      "cleanText": "same entry with dotted leaders and page furniture removed",
+      "indentLevel": 0,
+      "startsMidEntry": false,
+      "endsMidEntry": false,
+      "entryHints": {{
+        "phone": "best effort string or empty",
+        "name": "best effort string or empty",
+        "address": "best effort string or empty"
+      }},
+      "phones": ["all visible phone number strings for this segment"],
+      "names": ["all visible name strings for this segment"],
+      "addresses": ["all visible address strings for this segment"],
+      "reviewFlags": ["optional machine-readable flags, or empty array"],
+      "continuityFromPrevious": {{
+        "sameEntry": false,
+        "previousSegmentId": "",
+        "mergedCleanText": "",
+        "confidence": 0.0,
+        "reason": ""
+      }},
+      "confidence": 0.0
+    }}
+  ]
+}}
+
+Rules:
+- Output JSON only.
+- Keep sequence in reading order from top to bottom.
+- entryType is required. Use "directory_entry" only for normal phonebook listing rows. Use "ad_block" for display advertisements or boxed/promotional blocks if you transcribe them for review. Use "category_heading" for section headings if you transcribe them for review.
+- Prefer omitting ad_block and category_heading segments entirely. If you include them, keep phones, names, and addresses arrays empty unless the text is needed for review.
+- Set indentLevel from the visible left indentation of the segment's name line within the standard listing column: 0 for a normal top-level row, 1 for a row indented under the previous top-level row, 2 for a row indented under a level-1 row, and so on. Count logical indent levels, not pixels.
+- Preserve leading spaces in rawText when they are useful evidence for indentation, but do not put indentation spaces in cleanText or name candidates.
+- If an indented row is a separate visible entry, keep it as a separate segment and set indentLevel instead of merging it into the previous segment.
+- Set startsMidEntry=true only if the visible target image begins with an entry fragment that is clearly cut off.
+- Set endsMidEntry=true only if the visible target image ends with an entry fragment that is clearly cut off.
+- Put every visible phone number, name, and address candidate into phones, names, and addresses arrays.
+- entryHints must be the single best candidate for legacy downstream code; do not omit alternatives from the arrays.
+- cleanText must remove dotted leaders, decorative separators, page numbers, column labels, and index-only marks while preserving names, phone numbers, and addresses.
+- If an entry name wraps across multiple visible lines, join the wrapped name into one name candidate. Example: "関西理容美容" followed by "専門学校" is one name, "関西理容美容専門学校".
+- Judge advertisements by visual layout, not by keywords. A normal directory row may contain words such as representative, telephone, principal, or school office; do not classify it as an advertisement because of words alone.
+- Category headings such as "工業・技術" or "服飾" are not entries. Mark them category_heading only if you keep them for review.
+- Ignore advertisement-only blocks by layout, including large boxed display ads or promotional blocks visually separate from the standard listing rows. Prefer the normal directory listing row when both a listing row and an advertisement for the same organization are visible.
+- Curly braces around phone numbers carry layout meaning. A left-side curly brace before a vertical phone-number group means the grouped phones belong to the one name on the left. A right-side curly brace after a vertical phone-number group means the grouped phones belong to the one address on the right.
+- If both left-side and right-side braces are present, preserve both relationships: one name may have multiple phones, the same name may have multiple addresses, and one address may be shared by multiple phones.
+- When a brace group is clear, treat the grouped lines as one logical segment when possible. Put grouped phones in phones in top-to-bottom order. Put the shared name once in names when one name applies to all phones; put the shared address once in addresses when one address applies to all phones. Add multi_phone_brace_group to reviewFlags.
+- Preserve visible curly brace evidence in rawText. In cleanText, it is acceptable to remove decorative brace glyphs only if phones, names, addresses, and reviewFlags still make the grouping unambiguous.
+- If OCR confidence is not high enough to merge a brace group into one segment, keep separate segments but add reviewFlags such as multi_phone_brace_group and uncertain_layout, and preserve any visible opening or closing brace in rawText.
+- Historical addresses often use short municipality or ward abbreviations before the town name, usually with a small comma-like separator. Use these as reading hints when deciding ambiguous address text:
+  大阪市 wards: 北=大阪市北区, 大淀=大阪市大淀区, 都/都島=大阪市都島区, 福/福島=大阪市福島区, 此/此花=大阪市此花区, 東=大阪市東区, 西=大阪市西区, 港=大阪市港区, 大/大正=大阪市大正区, 天/天王寺=大阪市天王寺区, 南=大阪市南区, 浪/浪速=大阪市浪速区, 西淀/西淀川=大阪市西淀川区, 東淀/東淀川=大阪市東淀川区, 東成=大阪市東成区, 生/生野=大阪市生野区, 旭=大阪市旭区, 城/城東=大阪市城東区, 阿/阿倍野=大阪市阿倍野区, 住/住吉=大阪市住吉区, 東住/東住吉=大阪市東住吉区, 西成=大阪市西成区.
+  Nearby municipalities: 尼/尼崎=尼崎市, 伊丹=伊丹市, 西宮=西宮市, 芦屋=芦屋市, 神戸=神戸市, 布/布施=布施市, 守/守口=守口市, 堺=堺市.
+  Examples: 尼,若王寺中ノ坪 may look like 尼若王寺中ノ坪; 生,鶴橋北1-5598 may look like 生鶴橋北1-5598. Preserve what is visible, but use this context to avoid misreading the prefix or town name.
+- Add reviewFlags for uncertain cases such as starts_mid_entry, ends_mid_entry, multi_phone, multi_address, possible_ad_entry, low_confidence_ocr, or uncertain_layout.
+- Only the first segment may use continuityFromPrevious.sameEntry=true.
+- If the first segment continues the previous OCR tail's last segment, set startsMidEntry=true and continuityFromPrevious.sameEntry=true, set previousSegmentId, mergedCleanText, confidence, and reason, and add continued_from_previous to reviewFlags.
+- Do not put previous-tail-only text into rawText, cleanText, phones, names, or addresses.
+- Confidence must be between 0.0 and 1.0.
+- If no valid phonebook entries are visible, return an empty segments array.

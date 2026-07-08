@@ -1,0 +1,56 @@
+Book: {book_name}
+Page: {page}
+Column: {column}
+
+You will receive:
+1. target column image
+
+Read only the target column image. The OCR stage runs in batch mode, so do not
+depend on text from neighboring columns. Use visible indentation, cut-off text,
+and layout evidence in this image to mark possible boundary continuation.
+
+Return this compact JSON only:
+{{
+  "r": [
+    {{
+      "t": "d",
+      "x": "clean entry text with dotted leaders and page furniture removed",
+      "i": 0,
+      "p": ["all visible phone number strings for this segment"],
+      "n": ["all visible name strings for this segment"],
+      "a": ["all visible address strings for this segment"],
+      "f": []
+    }}
+  ]
+}}
+
+Key meanings:
+- r: rows/segments in top-to-bottom reading order.
+- t: "d" normal directory entry, "a" display advertisement, "h" category heading.
+- x: cleaned visible text for the same row. Preserve names, phone numbers, addresses, braces, and line-order evidence; remove dotted leaders, separators, page numbers, column labels, and index-only marks.
+- i: logical indentation level of the name line: 0 normal, 1 under the previous top-level row, 2 under a level-1 row, and so on.
+- p/n/a: every visible phone/name/address candidate for the row.
+- f: optional machine-readable flags. Use [] when none.
+- s/e: optional booleans for starts_mid_entry and ends_mid_entry. Omit or false when not clearly cut off.
+
+Rules:
+- Output JSON only.
+- Keep rows in reading order from top to bottom.
+- Prefer omitting advertisement and category-heading rows entirely. If you keep them, set t to "a" or "h" and keep p, n, and a empty unless needed for review.
+- Set i from the visible left indentation of the segment's name line within the standard listing column. Count logical indent levels, not pixels.
+- If an indented row is a separate visible entry, keep it as a separate row and set i instead of merging it into the previous row.
+- Put every visible phone number, name, and address candidate into p, n, and a.
+- If an entry name wraps across multiple visible lines, join the wrapped name into one name candidate. Example: "関西理容美容" followed by "専門学校" is one name, "関西理容美容専門学校".
+- Judge advertisements by visual layout, not by keywords. A normal directory row may contain words such as representative, telephone, principal, or school office; do not classify it as an advertisement because of words alone.
+- Category headings such as "工業・技術" or "服飾" are not entries. Mark them t="h" only if you keep them for review.
+- Ignore advertisement-only blocks by layout, including large boxed display ads or promotional blocks visually separate from standard listing rows. Prefer the normal directory listing row when both a listing row and an advertisement for the same organization are visible.
+- Curly braces around phone numbers carry layout meaning. A left-side curly brace before a vertical phone-number group means the grouped phones belong to the one name on the left. A right-side curly brace after a vertical phone-number group means the grouped phones belong to the one address on the right.
+- If both left-side and right-side braces are present, preserve both relationships: one name may have multiple phones, the same name may have multiple addresses, and one address may be shared by multiple phones.
+- When a brace group is clear, treat the grouped lines as one logical row when possible. Put grouped phones in p in top-to-bottom order. Put the shared name once in n when one name applies to all phones; put the shared address once in a when one address applies to all phones. Add multi_phone_brace_group to f.
+- Historical addresses often use short municipality or ward abbreviations before the town name, usually with a small comma-like separator. Use these as reading hints when deciding ambiguous address text:
+  大阪市 wards: 北=大阪市北区, 大淀=大阪市大淀区, 都/都島=大阪市都島区, 福/福島=大阪市福島区, 此/此花=大阪市此花区, 東=大阪市東区, 西=大阪市西区, 港=大阪市港区, 大/大正=大阪市大正区, 天/天王寺=大阪市天王寺区, 南=大阪市南区, 浪/浪速=大阪市浪速区, 西淀/西淀川=大阪市西淀川区, 東淀/東淀川=大阪市東淀川区, 東成=大阪市東成区, 生/生野=大阪市生野区, 旭=大阪市旭区, 城/城東=大阪市城東区, 阿/阿倍野=大阪市阿倍野区, 住/住吉=大阪市住吉区, 東住/東住吉=大阪市東住吉区, 西成=大阪市西成区.
+  Nearby municipalities: 尼/尼崎=尼崎市, 伊丹=伊丹市, 西宮=西宮市, 芦屋=芦屋市, 神戸=神戸市, 布/布施=布施市, 守/守口=守口市, 堺=堺市.
+  Examples: 尼,若王寺中ノ坪 may look like 尼若王寺中ノ坪; 生,鶴橋北1-5598 may look like 生鶴橋北1-5598. Preserve what is visible, but use this context to avoid misreading the prefix or town name.
+- Add f values for uncertain cases such as starts_mid_entry, ends_mid_entry, multi_phone, multi_address, possible_ad_entry, low_confidence_ocr, or uncertain_layout.
+- Mark s=true when the first visible entry appears to be a subordinate/continued item whose parent heading or company name is above the top edge or in the previous column. Mark e=true when the last visible entry appears cut off at the bottom edge.
+- If no valid phonebook entries are visible, return {{"r":[]}}.

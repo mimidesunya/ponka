@@ -1,0 +1,12 @@
+output/slices_all/*
+output/ocr_out_all/*
+config.json
+config.adc.local.json
+__pycache__/
+*.pyc
+
+# 大容量データ・生成物・仮想環境（git には入れない）
+data/
+output/
+.venv/
+.venv311/

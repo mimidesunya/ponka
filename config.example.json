@@ -1,0 +1,10 @@
+{
+  "gemini": {
+    "auth": "adc",
+    "project": "YOUR_GOOGLE_CLOUD_PROJECT",
+    "location": "global",
+    "ocrModel": "gemini-3.1-flash-preview",
+    "httpTimeoutMs": 300000,
+    "maxRetries": 3
+  }
+}
